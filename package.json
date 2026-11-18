@@ -1,0 +1,27 @@
+{
+  "name": "certificates",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "api"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:api\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:api": "npm run dev --workspace=api",
+    "build": "npm run build --workspaces",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:api": "npm run build --workspace=api",
+    "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=api",
+    "deploy": "vercel --prod",
+    "lint": "npm run lint --workspaces"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "vercel": "^34.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

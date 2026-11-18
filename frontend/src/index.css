@@ -1,0 +1,133 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-family: 'Figtree', system-ui, sans-serif;
+    color: #38364f;
+    min-height: 100vh;
+    background-color: #f7f5fc;
+    background-image:
+      radial-gradient(60rem 36rem at 0% -10%, rgb(221 211 247 / 0.7), transparent 60%),
+      radial-gradient(48rem 32rem at 100% 105%, rgb(255 220 203 / 0.55), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: 'Bricolage Grotesque', system-ui, sans-serif;
+    color: #38364f;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: #ddd3f7;
+  }
+
+  :focus-visible {
+    outline: 3px solid rgb(143 123 214 / 0.55);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Superficies */
+  .card {
+    @apply rounded-card border border-line bg-white/80 shadow-soft backdrop-blur-sm;
+  }
+
+  /* Botones */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-semibold transition-colors duration-150;
+  }
+  .btn:disabled {
+    @apply cursor-not-allowed opacity-50;
+  }
+  .btn-primary {
+    @apply bg-lilac-300 text-ink hover:bg-lilac-400 active:bg-lilac-400;
+  }
+  .btn-secondary {
+    @apply border border-line bg-white text-ink hover:bg-lilac-100;
+  }
+  .btn-ghost {
+    @apply text-ink-soft hover:bg-lilac-100 hover:text-ink;
+  }
+
+  /* Campos */
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-ink;
+  }
+  .input {
+    @apply w-full rounded-field border border-line bg-white px-4 py-2.5 text-base text-ink transition-colors duration-150;
+  }
+  .input::placeholder {
+    color: #9b98b3;
+  }
+  .input:hover:not(:disabled) {
+    @apply border-lilac-300;
+  }
+  .input:focus {
+    @apply border-lilac-400 outline-none;
+    box-shadow: 0 0 0 3px rgb(171 153 230 / 0.3);
+  }
+
+  /* Selector de color: círculo con el color elegido */
+  .swatch {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0;
+    border: 3px solid #fff;
+    border-radius: 9999px;
+    background: none;
+    cursor: pointer;
+    box-shadow: 0 0 0 1px #e7e2f3, 0 4px 12px -4px rgb(91 74 158 / 0.25);
+  }
+  .swatch::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+  .swatch::-webkit-color-swatch {
+    border: none;
+    border-radius: 9999px;
+  }
+  .swatch::-moz-color-swatch {
+    border: none;
+    border-radius: 9999px;
+  }
+
+  /* Hoja del certificado (vista previa) */
+  .paper {
+    @apply relative aspect-[4/3] w-full overflow-hidden rounded-xl shadow-lift;
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+  .animate-breathe {
+    animation: breathe 1.8s ease-in-out infinite;
+  }
+}
