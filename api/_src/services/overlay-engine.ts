@@ -1,12 +1,12 @@
 import sharp from 'sharp'
-import { createCanvas, loadImage, registerFont, type CanvasRenderingContext2D, type Image } from 'canvas'
+import { createCanvas, loadImage, GlobalFonts, type SKRSContext2D, type Image } from '@napi-rs/canvas'
 import * as path from 'path'
 import * as fs from 'fs'
 import { fileURLToPath } from 'url'
 import type { CertificateData, CertificateStyle, LogoPlacement } from '../models/schemas.js'
 import { buildBackgroundSvg, textPalette, WIDTH, HEIGHT } from './background-templates.js'
 
-// api/src/services -> api/fonts (y api/dist/services -> api/fonts tras compilar)
+// api/_src/services -> api/fonts (en Vercel se incluyen con `includeFiles` en vercel.json)
 const FONTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../fonts')
 
 const FONT_FILES = [
@@ -44,14 +44,15 @@ for (const f of FONT_FILES) {
     continue
   }
   try {
-    registerFont(fontPath, { family: f.family, weight: f.weight })
+    // Regular y negrita comparten familia: skia elige el archivo según el peso que pida cada `ctx.font`.
+    GlobalFonts.registerFromPath(fontPath, f.family)
   } catch (e) {
     console.warn(`No se pudo registrar la fuente ${f.file}:`, e)
   }
 }
 
 /** Parte el texto en líneas que caben en `maxWidth` (sin cortar palabras). */
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+function wrapLines(ctx: SKRSContext2D, text: string, maxWidth: number): string[] {
   const words = text.split(/\s+/).filter(Boolean)
   const lines: string[] = []
   let line = ''
@@ -70,7 +71,7 @@ function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number
 
 /** Dibuja texto centrado; reduce el tamaño hasta que quepa en `maxLines` líneas. Devuelve el alto usado. */
 function drawFittedText(
-  ctx: CanvasRenderingContext2D,
+  ctx: SKRSContext2D,
   text: string,
   opts: { x: number; y: number; maxWidth: number; maxLines: number; size: number; minSize: number; font: (size: number) => string; color: string }
 ): { height: number; lastBaseline: number; size: number } {
@@ -133,14 +134,14 @@ function loadWatermark(): Promise<Image | null> {
 }
 
 /** Dibuja `img` centrada en (cx, bottom) sin salirse de maxW × maxH. */
-function drawContained(ctx: CanvasRenderingContext2D, img: Image, cx: number, bottom: number, maxW: number, maxH: number) {
+function drawContained(ctx: SKRSContext2D, img: Image, cx: number, bottom: number, maxW: number, maxH: number) {
   const ratio = Math.min(maxW / img.width, maxH / img.height)
   const w = img.width * ratio
   const h = img.height * ratio
   ctx.drawImage(img, cx - w / 2, bottom - h, w, h)
 }
 
-function line(ctx: CanvasRenderingContext2D, x1: number, x2: number, y: number, color: string, width = 3) {
+function line(ctx: SKRSContext2D, x1: number, x2: number, y: number, color: string, width = 3) {
   ctx.strokeStyle = color
   ctx.lineWidth = width
   ctx.beginPath()

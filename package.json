@@ -13,7 +13,6 @@
     "build": "npm run build --workspaces",
     "build:frontend": "npm run build --workspace=frontend",
     "build:api": "npm run build --workspace=api",
-    "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=api",
     "deploy": "vercel --prod",
     "lint": "npm run lint --workspaces"
   },

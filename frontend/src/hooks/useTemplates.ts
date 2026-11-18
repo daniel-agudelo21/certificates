@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getTemplates, saveTemplate, updateTemplate, deleteTemplate } from '../services/api'
+import { getTemplates, saveTemplate, updateTemplate, deleteTemplate } from '../services/templates'
 import type { Template } from '../types'
 
 export function useTemplates() {

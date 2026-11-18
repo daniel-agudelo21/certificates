@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { X, Plus, Save, FolderOpen } from 'lucide-react'
 import { TemplateCard } from './TemplateCard'
-import { saveTemplate } from '../services/api'
-import type { Template, CertificateData } from '../types'
+import type { Template } from '../types'
 
 interface TemplateManagerProps {
   templates: Template[]
   onLoad: (template: Template) => void
-  currentData: CertificateData
+  onSave: (name: string) => Promise<unknown>
+  onDelete: (id: string) => Promise<unknown>
   isOpen: boolean
   onClose: () => void
 }
 
-export function TemplateManager({ templates, onLoad, currentData, isOpen, onClose }: TemplateManagerProps) {
+export function TemplateManager({ templates, onLoad, onSave, onDelete, isOpen, onClose }: TemplateManagerProps) {
   const [showSave, setShowSave] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -21,12 +21,11 @@ export function TemplateManager({ templates, onLoad, currentData, isOpen, onClos
     if (!saveName.trim() || saving) return
     setSaving(true)
     try {
-      await saveTemplate({ name: saveName, data: currentData })
+      await onSave(saveName.trim())
       setShowSave(false)
       setSaveName('')
     } catch (error) {
-      console.error('Error saving template:', error)
-      alert('Error al guardar plantilla')
+      alert(error instanceof Error ? error.message : 'No se pudo guardar la plantilla')
     } finally {
       setSaving(false)
     }
@@ -78,11 +77,7 @@ export function TemplateManager({ templates, onLoad, currentData, isOpen, onClos
                   template={template}
                   onLoad={onLoad}
                   onEdit={() => {}}
-                  onDelete={(id) => {
-                    if (confirm(`¿Eliminar "${template.name}"?`)) {
-                      fetch(`/api/templates/${id}`, { method: 'DELETE' }).then(() => window.location.reload())
-                    }
-                  }}
+                  onDelete={(id) => { onDelete(id).catch(() => alert('No se pudo eliminar la plantilla')) }}
                 />
               ))}
             </div>

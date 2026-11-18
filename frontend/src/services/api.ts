@@ -1,4 +1,4 @@
-import type { CertificateData, CertificateStyle, GenerateRequest, GenerateResponse, Template } from '../types'
+import type { CertificateData, CertificateStyle, GenerateRequest, GenerateResponse } from '../types'
 
 const API_BASE = '/api'
 
@@ -35,53 +35,4 @@ export async function downloadCertificate(data: CertificateData, style: Certific
   }
 
   return response.blob()
-}
-
-export async function getTemplates(): Promise<Template[]> {
-  const response = await fetch(`${API_BASE}/templates`, { headers: getHeaders() })
-
-  if (!response.ok) {
-    throw new Error('Error al cargar plantillas')
-  }
-
-  return response.json()
-}
-
-export async function saveTemplate(template: Omit<Template, 'id' | 'createdAt' | 'updatedAt'>): Promise<Template> {
-  const response = await fetch(`${API_BASE}/templates`, {
-    method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify(template),
-  })
-
-  if (!response.ok) {
-    throw new Error('Error al guardar plantilla')
-  }
-
-  return response.json()
-}
-
-export async function updateTemplate(id: string, data: Partial<Template>): Promise<Template> {
-  const response = await fetch(`${API_BASE}/templates/${id}`, {
-    method: 'PUT',
-    headers: getHeaders(),
-    body: JSON.stringify(data),
-  })
-
-  if (!response.ok) {
-    throw new Error('Error al actualizar plantilla')
-  }
-
-  return response.json()
-}
-
-export async function deleteTemplate(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/templates/${id}`, {
-    method: 'DELETE',
-    headers: getHeaders(),
-  })
-
-  if (!response.ok) {
-    throw new Error('Error al eliminar plantilla')
-  }
 }

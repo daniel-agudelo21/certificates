@@ -13,7 +13,7 @@ type Align = 'start' | 'center' | 'end'
 /**
  * Zonas máximas seguras del logo (dentro del marco, sin tocar adornos ni textos). El logo ocupa entre
  * LOGO_SIZE_MIN % y LOGO_SIZE_MAX % de su zona. Debe coincidir con LOGO_REGIONS de
- * api/src/services/overlay-engine.ts.
+ * api/_src/services/overlay-engine.ts.
  */
 const px = (x: number, y: number, w: number, h: number, alignX: Align, alignY: Align, label: string) => ({
   x: x / W, y: y / H, w: w / W, h: h / H, alignX, alignY, label,

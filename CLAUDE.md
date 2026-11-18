@@ -5,11 +5,11 @@ Aplicación web interna para que un equipo de diseño genere certificados, los p
 ## Contexto y restricciones (leer antes de proponer cambios)
 
 - **Uso muy bajo**: pocas personas, pocas generaciones al día (README estima ~3 certificados/día). La concurrencia es prácticamente nula.
-- **Todo corre en planes gratuitos**: Vercel Hobby y Firebase Spark. No se guarda ningún certificado. Objetivo: **$0/mes**.
+- **Todo corre en el plan gratuito de Vercel (Hobby)**; sin base de datos ni almacenamiento. Ningún certificado ni plantilla se guarda en un servidor. Objetivo: **$0/mes**. (Hobby es para uso no comercial: revisar los términos si el equipo lo usa como empresa.)
 - Consecuencias para el diseño:
   - Prefiere soluciones simples. **No** agregues colas, caché distribuida, workers, Redis, CDN ni infraestructura de escala.
   - Generar un certificado **no llama a ninguna API de pago**. Los modelos de imagen de Google (Nano Banana, etc.) tienen `limit: 0` en el free tier de este proyecto: **no los reintroduzcas** sin confirmar con el usuario que activó facturación.
-  - Vercel Hobby limita la duración de las funciones (el `vercel.json` pide 60 s); un flujo de generación largo puede acercarse al límite.
+  - Vercel Hobby limita la duración y el tamaño de las funciones (el `vercel.json` pide 30 s) y el cuerpo de las peticiones (~4,5 MB; por eso la firma se reduce en el navegador). Un flujo de generación más largo puede acercarse al límite.
   - No introduzcas servicios de pago ni dependencias que requieran tarjeta sin consultarlo.
 
 ## Decisiones tomadas
@@ -24,39 +24,40 @@ Monorepo npm workspaces (`frontend`, `api`), Node >= 20.
 | Capa | Tecnología |
 |------|-----------|
 | Frontend | React 18 + Vite 5 + TypeScript + Tailwind 3 (`jspdf`, `html2canvas` para PDF, `lucide-react` iconos) |
-| API | Express 5 (handlers estilo Vercel Functions), TypeScript ESM (imports con extensión `.js`), Zod |
-| Render | SVG por estilo (`background-templates.ts`) → `sharp` → `canvas` (textos, logo) → 300 DPI. Fuentes en `api/fonts/` |
-| Datos | Firestore vía `firebase-admin` (plantillas, registro de certificados, rate limit) |
+| API | **Una sola función de Vercel** (`api/generate.ts`) con el código en `api/_src`; servidor Express solo para desarrollo local. TypeScript ESM (imports con extensión `.js`), Zod |
+| Render | SVG por estilo (`background-templates.ts`) → `sharp` → `@napi-rs/canvas` (textos, logo; sin dependencias del sistema, a diferencia de `canvas`, que suele fallar en Vercel) → 300 DPI. Fuentes en `api/fonts/` |
+| Datos | **Ninguno en el servidor**: las plantillas se guardan en el `localStorage` del navegador (`frontend/src/services/templates.ts`) |
 | Archivos | **Ninguno**: los certificados no se guardan en ningún lado |
 | Auth | **Ninguna, por decisión de diseño** (ver abajo) |
-| Deploy | Vercel (monorepo, `vercel.json` en raíz y en `frontend/`) |
+| Deploy | Vercel desde la raíz del repo (`vercel.json`): el frontend se construye con `npm run build --workspace=frontend` y se sirve desde `frontend/dist`; `/api/generate` es la función |
 
 ## Estructura
 
 ```
-api/src/
-  generate.ts            POST /api/generate — orquesta todo el pipeline
-  templates.ts           CRUD /api/templates (Firestore, colección `templates`)
-  local-server.ts        Servidor Express para desarrollo local (puerto 3000)
-  index.ts               Solo valida config (no levanta servidor)
-  config.ts              Env vars y límites
-  models/schemas.ts      Schemas Zod (fuente de verdad del contrato de la API)
+api/
+  generate.ts            Entrada de la función de Vercel (POST /api/generate): solo reexporta el manejador
+  _src/                  Código real. El guion bajo es obligatorio: Vercel convierte en función cada .ts de api/ que no lo tenga
+    generate.ts          Manejador: valida, aplica el límite de uso y genera (vista previa o descarga)
+    local-server.ts      Servidor Express para desarrollo local (puerto 3000)
+    config.ts            Límites de uso
+    models/schemas.ts    Schemas Zod (fuente de verdad del contrato de la API)
+    services/background-templates.ts  Fondos SVG por estilo (formal/moderno/académico/creativo), semilla y colores de texto
+    services/overlay-engine.ts  Canvas: frases, curso, líneas en blanco, firma, logo, marca de agua y textos fijos; sharp: 300 DPI
+    services/certificate-id.ts  ID `CERT-YYYYMMDD-XXXXXX` que se devuelve en la vista previa
   assets/watermark.png   Logo «powered by hacku» (gris, fondo transparente) que va abajo en cada certificado
-  services/background-templates.ts  Fondos SVG por estilo (formal/moderno/académico/creativo) y colores de texto
-  services/overlay-engine.ts  Canvas: frases, curso, líneas en blanco, firma, logo, marca de agua y textos fijos; sharp: 300 DPI
-  services/certificate-id.ts  ID interno `CERT-YYYYMMDD-XXXXXX` (solo para el registro)
+  fonts/                 Tipografías (OFL) de los 4 estilos
 frontend/src/
   App.tsx                Renderiza directamente <CertificateForm />
   components/            CertificateForm, CertificatePreview, LogoPlacementPicker, PlacedLogo,
-                         TemplateManager, TemplateCard, AuthGate
-  hooks/                 useAuth, useGenerateCertificate, useTemplates
-  services/api.ts        fetch a `/api/*`;  services/firebase.ts  init de Firebase
+                         TemplateManager, TemplateCard, SectionHeader
+  hooks/                 useGenerateCertificate, useTemplates
+  services/              api.ts (fetch a `/api/generate`), templates.ts (localStorage), palette.ts, image.ts, logoPlacement.ts, styles.ts
   types.ts               Tipos del frontend (duplican los de Zod en la API)
 ```
 
-## Pipeline de generación (`api/src/generate.ts`)
+## Pipeline de generación (`api/_src/generate.ts`)
 
-1. Rate limit (ventana 60 s, máx. 10 req; en local en memoria, en producción en Firestore `rateLimits/`).
+1. Límite de uso en memoria (ventana 60 s, máx. 10 solicitudes). En Vercel vale por instancia de la función, no es global: frena ráfagas, no abusos sostenidos.
 2. Validación con `GenerateRequestSchema`; los errores indican el campo exacto (`data.logoSize: ...`).
 3. **Dos modos en el mismo endpoint, y no se guarda nada** (ni Blob ni disco; los certificados solo existen mientras se muestran o se descargan):
    - **Vista previa** (sin `style`): renderiza los **4 estilos** (`CERTIFICATE_STYLES`: formal, moderno, académico, creativo) en serie, para cuidar la memoria de Vercel, y devuelve `variants: [{style, previewUrl}]` con miniaturas JPEG de 1024 px como *data URL* (~170 KB en total). Unos 2 s, sin llamar a ninguna API. No hay selector de estilo: el usuario elige entre las miniaturas.
@@ -73,35 +74,29 @@ Los estilos son un parámetro del render (`style`), no un campo del certificado.
 ## Comandos
 
 ```bash
-npm run install:all     # instala todo
+npm install             # instala todo (workspaces)
 npm run dev             # frontend (5173) + API local (3000)
 npm run dev:frontend    # solo Vite; proxy de /api -> http://localhost:3000
-npm run dev:api         # solo la API: tsx watch src/local-server.ts
-npm run build           # build de ambos workspaces (frontend: tsc && vite build)
+npm run dev:api         # solo la API: tsx watch _src/local-server.ts
+npm run build           # build del frontend (tsc && vite build) y chequeo de tipos de la API (tsc --noEmit)
 npm run lint
-npm run deploy          # vercel --prod
+npx vercel              # despliegue de PRUEBA (enlace temporal); producción: npx vercel --prod
 ```
 
-La API local (`api/src/local-server.ts`) escucha en :3000; no requiere Vercel CLI. No hay tests configurados.
+La API local (`api/_src/local-server.ts`) escucha en :3000 y no requiere Vercel CLI. No hay tests configurados. Antes de tocar la estructura de `api/`, comprobar qué funciones detectaría Vercel (con `@vercel/fs-detectors`, `detectBuilders`): debe salir exactamente una, `api/generate.ts`.
 
 ## Variables de entorno
 
-Definidas en `api/.env` (ignorado por git); plantilla sin valores en `.env.example`. **Nunca escribas valores reales de variables de entorno en README, CLAUDE.md, código ni commits.**
-
-- API: `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET` (obligatorias, ver `validateConfig`)
-- `NODE_ENV !== 'production'` activa modo local: sin Firestore en `generate.ts` y rate limit en memoria.
+**La app no necesita ninguna.** No hay claves de IA, ni base de datos, ni almacenamiento. Si en el futuro se agrega alguna: va en `api/.env` (ignorado por git; plantilla sin valores en `.env.example`) y en las variables de entorno de Vercel. **Nunca escribas valores reales en README, CLAUDE.md, código ni commits.**
 
 ## Estado actual / ojos con esto
 
-- `AuthGate.tsx`, `hooks/useAuth.ts` y `services/firebase.ts` son **código muerto** (nadie los importa desde `App.tsx`). El cliente Firebase del frontend no se usa; Firestore solo se accede desde la API.
-- `templates.ts` **siempre** inicializa Firestore (sin modo local): las plantillas necesitan credenciales de Google aunque la generación no.
-- Las plantillas son globales (colección `templates`), no por usuario.
-- `config.limits.maxCertificatesPerUserPerDay` existe pero no se aplica; el rate limit es global (10 req/min).
+- **Las plantillas viven en el navegador** (`localStorage`, ~5 MB): cada persona ve solo las suyas y se pierden si borra los datos del navegador. Guardan el logo y la firma como imagen, así que pueden llenar el espacio (el error se muestra al usuario). Si se necesitan compartidas, habría que agregar una base de datos.
 - **Sin IA de imagen (nov 2026)**: los modelos de imagen de Gemini responden 429 con `limit: 0` en el free tier de este proyecto; por eso el render es por código. No los reintroduzcas sin confirmar que el usuario activó facturación.
-- Dependencias que quedaron sin uso tras quitar el almacenamiento y la IA: `@vercel/blob` y `@google/genai` (api/package.json); se pueden desinstalar. `api/local-storage/` contiene certificados de pruebas anteriores y se puede borrar.
-- Las fuentes (Merriweather, Inter; licencia OFL) están en `api/fonts/` y se resuelven relativas al módulo, para que funcionen también en Vercel.
-- Los tipos de `schemas.ts` (API) y `types.ts` (frontend) se mantienen a mano en paralelo; el `LogoData` del frontend incluye `file`, el de la API no. Si cambias uno, actualiza el otro.
-- Pendiente de seguridad: una versión anterior del README (commit inicial) contenía una clave de API real (ya sin uso en el código). Conviene rotarla en Google AI Studio.
+- El despliegue en Vercel **no se ha probado todavía en la nube**: la estructura de funciones se verificó con el detector de Vercel y todo funciona en local, pero falta un primer despliegue de prueba.
+- Las fuentes (OFL) se resuelven relativas al módulo (`api/fonts`) y llegan a la función por `includeFiles` en `vercel.json`; igual la marca de agua (`api/assets`).
+- Los tipos de `schemas.ts` (API) y `types.ts` (frontend) se mantienen a mano en paralelo. Si cambias uno, actualiza el otro.
+- El historial de git se reescribió antes del primer push porque contenía claves en el README; ya no hay ninguna. Conviene haber rotado la clave de Gemini que estuvo ahí.
 
 ## Diseño del frontend
 

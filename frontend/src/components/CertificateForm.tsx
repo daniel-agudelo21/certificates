@@ -124,7 +124,7 @@ export function CertificateForm() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [advanced, setAdvanced] = useState(false)
   const { generate, loading, progress, result, error } = useGenerateCertificate()
-  const { templates } = useTemplates()
+  const { templates, create, remove } = useTemplates()
   // Copia de los datos con los que se generó el certificado que se está mostrando.
   const [generatedWith, setGeneratedWith] = useState<string | null>(null)
   // Datos exactos de la última generación: la descarga se pide con estos, aunque el formulario ya haya cambiado.
@@ -147,7 +147,7 @@ export function CertificateForm() {
       const img = new window.Image()
       img.onload = async () => {
         updateField('logo', {
-          file,
+          size: file.size,
           base64,
           mimeType: file.type === 'image/svg+xml' ? 'image/svg+xml' : 'image/png',
           width: img.width,
@@ -265,7 +265,7 @@ export function CertificateForm() {
                     <img src={data.logo.base64} alt="Logo cargado" className="h-20 w-auto max-w-xs object-contain" />
                     <div className="text-center">
                       <p className="max-w-xs truncate font-semibold text-ink">{data.logo.name}</p>
-                      <p className="text-sm text-ink-muted">{data.logo.width}×{data.logo.height}px · {(data.logo.file.size / 1024).toFixed(1)} KB</p>
+                      <p className="text-sm text-ink-muted">{data.logo.width}×{data.logo.height}px · {(data.logo.size / 1024).toFixed(1)} KB</p>
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={() => document.getElementById('logo-upload')?.click()} className="btn btn-secondary">Cambiar logo</button>
@@ -461,7 +461,8 @@ export function CertificateForm() {
           setData({ ...DEFAULT_DATA, ...template.data, signature: { ...DEFAULT_DATA.signature, ...template.data.signature } })
           setShowTemplates(false)
         }}
-        currentData={data}
+        onSave={(name) => create({ name, data })}
+        onDelete={remove}
         isOpen={showTemplates}
         onClose={() => setShowTemplates(false)}
       />

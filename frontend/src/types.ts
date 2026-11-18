@@ -38,7 +38,8 @@ export interface ColorScheme {
 }
 
 export interface LogoData {
-  file: File
+  /** Peso del archivo original en bytes. */
+  size: number
   base64: string
   mimeType: 'image/png' | 'image/svg+xml'
   width: number
